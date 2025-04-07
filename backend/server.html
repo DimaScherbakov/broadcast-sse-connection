@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Управление SSE-сервером</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        input, button { margin: 5px 0; padding: 5px; }
+        .log { margin-top: 20px; background: #f0f0f0; padding: 10px; max-height: 300px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+<h1>Управление SSE-сервером</h1>
+
+<h3>Отправить сообщение</h3>
+<input type="text" id="sender" placeholder="Имя отправителя" /><br />
+<input type="text" id="message" placeholder="Текст сообщения" /><br />
+<button onclick="sendMessage()">Отправить сообщение</button>
+
+<h3>Увеличить уведомления</h3>
+<button onclick="incrementNotifications()">+1 Уведомление</button>
+
+<h3>Лог событий</h3>
+<div class="log" id="log"></div>
+
+<script>
+    const logDiv = document.getElementById('log');
+
+    function log(message) {
+        const entry = document.createElement('div');
+        entry.textContent = message;
+        logDiv.appendChild(entry);
+        logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    function sendMessage() {
+        const sender = document.getElementById('sender').value;
+        const text = document.getElementById('message').value;
+
+        fetch('http://localhost:3000/send-message', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sender, text })
+        }).then(res => res.json())
+                .then(data => log(`📤 Сообщение отправлено: ${JSON.stringify(data.message)}`))
+                .catch(err => log(`❌ Ошибка: ${err.message}`));
+    }
+
+    function incrementNotifications() {
+        fetch('http://localhost:3000/increment-notifications', {
+            method: 'POST'
+        }).then(res => res.json())
+                .then(data => log(`🔔 Уведомления: ${data.payload.count}`))
+                .catch(err => log(`❌ Ошибка: ${err.message}`));
+    }
+
+    const eventSource = new EventSource('http://localhost:3000/sse');
+
+    eventSource.addEventListener('ChatMessage', e => {
+        const data = JSON.parse(e.data);
+        log(`📩 Новое сообщение: ${data.text} от ${data.sender}`);
+    });
+
+    eventSource.addEventListener('NotificationsAvailable', e => {
+        const data = JSON.parse(e.data);
+        log(`📢 Уведомления обновлены: ${data.count}`);
+    });
+
+    eventSource.addEventListener('Ping', () => log('🔄 Ping'));
+</script>
+</body>
+</html>
